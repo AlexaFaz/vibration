@@ -1,0 +1,129 @@
+import numpy as np
+import pandas as pd
+import plotly.graph_objects as go
+import streamlit as st
+
+st.set_page_config(
+    page_title="Simulasi Sensor Getaran 19-K-101 vs Gempa", layout="wide"
+)
+
+st.title("⚡ Simulasi Sensor Vibration 19-K-101 (RU VI Balongan)")
+st.subheader("Analisis Aksesibilitas Sensor Getaran Mesin Terhadap Aktivitas Seismik")
+
+# --- SIDEBAR: AMBANG BATAS & INPUT GEMPA ---
+st.sidebar.header("⚙️ Parameter Sensor & Ambang Batas (Logsheet)")
+alert_limit = st.sidebar.number_input("Alert Limit (µm)", value=80.0)
+danger_limit = st.sidebar.number_input("Danger/Trip Limit (µm)", value=105.0)
+
+st.sidebar.header("🌋 Simulasi Parameter Gempa")
+magnitudo = st.sidebar.slider("Magnitudo Gempa (M)", 2.0, 7.5, 3.8, step=0.1)
+jarak_km = st.sidebar.slider(
+    "Jarak Hiposenter ke Balongan (km)", 5, 200, 30, step=5
+)
+kedalaman_km = st.sidebar.number_input("Kedalaman (km)", value=10.0)
+
+# --- KALKULASI AMPLITUDO GETARAN GEMPA DI LOKASI ---
+# Pendekatan sederhana estimasi tambahan getaran seismik pada sensor (µm)
+# Semakin besar M dan semakin dekat R, getaran di permukaan/fondasi makin besar
+jarak_hipo = np.sqrt(jarak_km**2 + kedalaman_km**2)
+amp_gempa_peak = (10 ** (0.5 * magnitudo)) / (jarak_hipo**0.8) * 12.0
+
+st.sidebar.metric("Estimasi Tambahan Getaran (µm)", f"{amp_gempa_peak:.2f} µm")
+
+# --- LOAD DATA HISTORICAL ---
+@st.cache_data
+def load_data():
+    # Mengambil sheet3 atau data aktual
+    df = pd.read_excel('Data PKL 19-K-101.xlsx', sheet_name='Sheet3')
+    df_clean = df[['Time', '19VI700', '19VI701', '19VI702', '19VI703']].dropna()
+    return df_clean
+
+try:
+    df_baseline = load_data()
+
+    # PILIH SENSOR
+    sensor_selected = st.selectbox(
+        "Pilih Sensor Vibration", ['19VI700', '19VI701', '19VI702', '19VI703']
+    )
+
+    # TAMBAHKAN EFEK GEMPA PADA WAKTU TERTENTU (MISAL DI TENGAH WAKTU OBSER VASI)
+    time_series = df_baseline['Time'].values
+    base_signal = df_baseline[sensor_selected].values
+    n_points = len(base_signal)
+
+    # Bikin sinyal gempa berbentuk gelombang transitory (puncak di menit ke-700)
+    center_idx = n_points // 2
+    time_idx = np.arange(n_points)
+    envelope = np.exp(-(((time_idx - center_idx) / 30) ** 2))  # Durasi gempa
+    seismic_signal = amp_gempa_peak * envelope * np.sin(2 * np.pi * time_idx / 5)
+
+    simulated_signal = base_signal + seismic_signal
+
+    # --- PLOT GRAFIK INTERAKTIF ---
+    fig = go.Figure()
+
+    # Baseline Data
+    fig.add_trace(
+        go.Scatter(
+            x=df_baseline['Time'],
+            y=base_signal,
+            mode='lines',
+            name='Data Asli (Baseline Operasional)',
+            line=dict(color='blue', width=1.5),
+        )
+    )
+
+    # Simulated Data
+    fig.add_trace(
+        go.Scatter(
+            x=df_baseline['Time'],
+            y=simulated_signal,
+            mode='lines',
+            name='Hasil Simulasi (+ Gempa)',
+            line=dict(color='orange', width=2),
+        )
+    )
+
+    # Threshold Lines
+    fig.add_hline(
+        y=alert_limit,
+        line_dash='dash',
+        line_color='yellow',
+        annotation_text='Alert Limit (80 µm)',
+    )
+    fig.add_hline(
+        y=danger_limit,
+        line_dash='dash',
+        line_color='red',
+        annotation_text='Danger Limit (105 µm)',
+    )
+
+    fig.update_layout(
+        title=f"Tren Grafik Sensor {sensor_selected} dengan Simulasi Aktivitas Seismik",
+        xaxis_title="Waktu",
+        yaxis_title="Vibration Amplitude (µm)",
+        hovermode="x unified",
+    )
+
+    st.plotly_chart(fig, use_container_width=True)
+
+    # --- ANALISIS KESIMPULAN ---
+    max_val = np.max(simulated_signal)
+    st.markdown("### 📊 Analisis Hasil Simulasi:")
+    if max_val < alert_limit:
+        st.success(
+            f"✅ **TIDAK KEREKAM/TIDAK MEMICU ALARM:** Nilai maksimum hasil kombinasi adalah **{max_val:.2f} µm**, masih berada di bawah Alert Limit ({alert_limit} µm). Hal ini menjelaskan mengapa gempa histori magnitudo kecil/jauh tidak terlihat menonjol pada tren operasional harian."
+        )
+    elif alert_limit <= max_val < danger_limit:
+        st.warning(
+            f"⚠️ **TEREKAM DAN MEMICU ALERT:** Nilai getaran mencapai **{max_val:.2f} µm** (Melewati Alert Limit {alert_limit} µm)."
+        )
+    else:
+        st.error(
+            f"🚨 **DANGER / TRIP:** Nilai getaran mencapai **{max_val:.2f} µm** (Melewati Danger Limit {danger_limit} µm). Sistem akan memicu ototrip pada kompresor!"
+        )
+
+except Exception as e:
+    st.error(
+        f"Gagal memuat file. Pastikan file 'Data PKL 19-K-101.xlsx' berada di folder yang sama. Error: {e}"
+    )
