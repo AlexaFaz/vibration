@@ -1,0 +1,10 @@
+No,Event No,Date time (UTC),Latitude,Longitude,Magnitude,Mag Type,Depth (km),Phase Count,Azimuth Gap,Location,Source,
+1,76740,17:55.0,-6.22,108.28,3.2,,10,,,"Java, Indonesia",All,8/13/2020
+1,102857,04:37.0,-6.22954,108.25385,3.8,,10,,,"Java, Indonesia",All,2/19/2023
+2,102858,31:41.0,-6.11828,108.33032,2.8,,10,,,"Java, Indonesia",All,2/19/2023
+,,,,,,,,,,,,
+,,,,,,,,,,,,
+,,,,Tanggal,Longitude,Latitude,Magnitudo,Kedalaman,,,,
+,,,,13/8/2020,108.28,-6.22,3.2,10,,,,
+,,,,19/2/2023,108.25385,-6.22954,3.8,10,,,,
+,,,,,108.33032,-6.11828,2.8,10,,,,
