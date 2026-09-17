@@ -1,7 +1,3 @@
-import streamlit as st
-
-# Kode kamu berikutnya:
-zoom_data = st.sidebar.checkbox("Zoom Data", value=False)
 import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
@@ -65,7 +61,7 @@ try:
     # --- SIDEBAR 2: TOGGLE ZOOM GRAFIK ---
     st.sidebar.header("🔍 Tampilan Grafik")
     zoom_data = st.sidebar.checkbox(
-        "Zoom Sumbu Y ke Data Riil (Sesuai Excel)", value=False
+        "Zoom Sumbu Y ke Data Riil (Sesuai Excel)", value=True
     )
 
     # --- SIDEBAR 3: PARAMETER GEMPA INTERAKTIF ---
@@ -84,7 +80,7 @@ try:
         "Kedalaman Hiposenter (km):",
         min_value=2,
         max_value=200,
-        value=10,
+        value=24,
         step=2,
     )
 
@@ -159,6 +155,13 @@ try:
             annotation_text="Danger Limit (105 µm)",
         )
         fig.update_layout(yaxis_range=[0, 115])
+
+    # PENGATURAN SUMBU X AGAR MENAMPILKAN SETIAP JAM (00:00 - 23:00)
+    fig.update_xaxes(
+        dtick=3600000,  # Interval 1 jam (dalam milidetik)
+        tickformat="%H:%M",  # Format Jam:Menit
+        tickangle=-45,  # Dimiringkan 45 derajat agar rapi dan tidak bertumpuk
+    )
 
     fig.update_layout(
         title=f"Perbandingan Tren Sensor {sensor_display} (Riil vs Simulasi Gempa)",
