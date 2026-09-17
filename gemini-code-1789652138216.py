@@ -1,3 +1,7 @@
+import streamlit as st
+
+# Kode kamu berikutnya:
+zoom_data = st.sidebar.checkbox("Zoom Data", value=False)
 import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
