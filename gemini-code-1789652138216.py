@@ -10,8 +10,8 @@ st.set_page_config(
 st.title("🌋 Simulasi Sensitivitas Sensor Getaran 19-K-101 vs Parameter Seismik")
 st.markdown(
     """
-Aplikasi ini membandingkan **Tren Data Riil Stabil (Baseline Operasional)** dengan **Simulasi Getaran Tambahan** 
-akibat guncangan gempa bumi berdasarkan variabel Magnitudo ($M$) dan Jarak Hiposenter ($R$).
+Aplikasi ini menampilkan **Grafik Tren Data Riil Operasional (24 Jam Penuh)** dan perbandingannya dengan 
+**Simulasi Respon Getaran** akibat variabel Magnitudo ($M$) dan Hiposenter ($R$).
 """
 )
 
@@ -93,22 +93,13 @@ try:
     st.sidebar.metric("Jarak Hiposenter Total", f"{R_hipo:.1f} km")
     st.sidebar.metric("Est. Tambahan Amplitudo Gempa", f"{amp_tambahan_um:.2f} µm")
 
-    # --- PROSES SIMULASI GELOMBANG GEMPA ---
+    # --- PREPARASI DATA ---
     df_selected = df_raw[[time_col, sensor_col]].dropna().copy()
     df_selected.columns = ["Waktu", "Nilai_Stabil_Riil"]
 
-    n_data = len(df_selected)
-    time_index = np.arange(n_data)
-
-    center_idx = n_data // 2
-    durasi_gempa = 25
-    envelope = np.exp(-(((time_index - center_idx) / durasi_gempa) ** 2))
-    seismic_wave = (
-        amp_tambahan_um * envelope * np.sin(2 * np.pi * (time_index) / 3.0)
-    )
-
+    # Menambahkan offset tambahan dari simulasi secara konstan di seluruh rentang jam
     df_selected["Nilai_Simulasi"] = (
-        df_selected["Nilai_Stabil_Riil"] + seismic_wave
+        df_selected["Nilai_Stabil_Riil"] + amp_tambahan_um
     )
 
     # --- PLOTTING GRAFIK INTERAKTIF ---
@@ -120,26 +111,27 @@ try:
             x=df_selected["Waktu"],
             y=df_selected["Nilai_Stabil_Riil"],
             mode="lines",
-            name=f"Data Historis Riil ({t_label}) - Stabil",
+            name=f"Data Historis Riil ({t_label})",
             line=dict(color="#1f77b4", width=2),
         )
     )
 
-    # 2. Tren Hasil Simulasi Gempa
-    fig.add_trace(
-        go.Scatter(
-            x=df_selected["Waktu"],
-            y=df_selected["Nilai_Simulasi"],
-            mode="lines",
-            name=f"Simulasi Respon (+ Gempa M{mag}, Hiposenter {R_hipo:.0f}km)",
-            line=dict(color="#ff7f0e", width=2),
+    # 2. Tren Hasil Simulasi (jika magnitudo dinaikkan)
+    if amp_tambahan_um > 0.05:
+        fig.add_trace(
+            go.Scatter(
+                x=df_selected["Waktu"],
+                y=df_selected["Nilai_Simulasi"],
+                mode="lines",
+                name=f"Simulasi Respon (+ Gempa M{mag}, Hiposenter {R_hipo:.0f}km)",
+                line=dict(color="#ff7f0e", width=2, dash="dash"),
+            )
         )
-    )
 
-    # Logika Pengaturan Sumbu Y (Zoom vs Standard)
+    # Logika Skala Y (Zoom vs Standar Limits)
     if zoom_data:
-        y_min = df_selected["Nilai_Stabil_Riil"].min() - 0.2
-        y_max = max(df_selected["Nilai_Simulasi"].max() + 0.2, y_min + 1.5)
+        y_min = df_selected["Nilai_Stabil_Riil"].min() - 0.3
+        y_max = max(df_selected["Nilai_Simulasi"].max() + 0.3, y_min + 1.5)
         fig.update_layout(yaxis_range=[y_min, y_max])
     else:
         fig.add_hline(
@@ -156,16 +148,17 @@ try:
         )
         fig.update_layout(yaxis_range=[0, 115])
 
-    # PENGATURAN SUMBU X AGAR MENAMPILKAN SETIAP JAM (00:00 - 23:00)
+    # FORMAT SUMBU X: MENAMPILKAN SETIAP JAM (00:00 - 23:00)
     fig.update_xaxes(
-        dtick=3600000,  # Interval 1 jam (dalam milidetik)
-        tickformat="%H:%M",  # Format Jam:Menit
-        tickangle=-45,  # Dimiringkan 45 derajat agar rapi dan tidak bertumpuk
+        nticks=25,
+        tickformat="%H:%M",
+        tickangle=-45,
+        showgrid=True,
     )
 
     fig.update_layout(
-        title=f"Perbandingan Tren Sensor {sensor_display} (Riil vs Simulasi Gempa)",
-        xaxis_title="Waktu (UTC)",
+        title=f"Tren 24 Jam Sensor {sensor_display} ({t_label})",
+        xaxis_title="Waktu (Jam)",
         yaxis_title="Vibration Amplitude (µm)",
         hovermode="x unified",
         height=550,
@@ -185,7 +178,7 @@ try:
     st.markdown("### 📝 Kesimpulan Hasil Simulasi:")
     if max_sim < 80:
         st.success(
-            f"🟢 **TETAP STABIL (TIDAK MEMICU ALARM):** Dengan **Magnitudo M{mag}** dan **Jarak Hiposenter {R_hipo:.1f} km**, puncak getaran hanya mencapai **{max_sim:.2f} µm**. Ini membuktikan mengapa pada kejadian gempa riil tren grafik sensor **tetap terlihat datar/stabil**."
+            f"🟢 **TETAP STABIL (TIDAK MEMICU ALARM):** Dengan **Magnitudo M{mag}** dan **Jarak Hiposenter {R_hipo:.1f} km**, puncak getaran hanya mencapai **{max_sim:.2f} µm**. Tren grafik terlihat datar dan konsisten di seluruh jam pengamatan."
         )
     elif 80 <= max_sim < 105:
         st.warning(
